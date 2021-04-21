@@ -1,23 +1,31 @@
-use std::hash::Hash;
-use std::fmt::{Display, Debug};
-use std::cmp::{Eq, PartialEq, Ord, PartialOrd, Ordering};
-use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
-use std::fs::File;
 use num_traits::{Num, Unsigned};
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
+use std::collections::HashMap;
+use std::fmt::{Debug, Display};
+use std::fs::File;
+use std::hash::Hash;
+use std::io::{BufRead, BufReader};
 
 pub trait BinHashed: Clone + Debug + Eq + Ord + Hash {
-    type HashType : Num + Unsigned + Copy + Display + Debug + Eq + Ord + Hash;
+    type HashType: Num + Unsigned + Copy + Display + Debug + Eq + Ord + Hash;
 
-    fn from_hash(hash: Self::HashType) -> Self where Self : Sized;
+    fn from_hash(hash: Self::HashType) -> Self
+    where
+        Self: Sized;
 
-    fn from_string(string: &str) -> Self where Self : Sized;
+    fn from_string(string: &str) -> Self
+    where
+        Self: Sized;
 
-    fn from_hash_string(hash: Self::HashType, string: &str) -> Self where Self : Sized;
+    fn from_hash_string(hash: Self::HashType, string: &str) -> Self
+    where
+        Self: Sized;
 
     fn get_hash(&self) -> Self::HashType;
 
     fn get_string(&self) -> &str;
+
+    fn format_to(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
 }
 
 #[derive(Clone)]
@@ -30,7 +38,10 @@ impl BinHashed for BinFNV {
     type HashType = u32;
 
     fn from_hash(hash: Self::HashType) -> Self {
-        Self { hash, unhashed: String::new() }
+        Self {
+            hash,
+            unhashed: String::new(),
+        }
     }
 
     fn from_string(string: &str) -> Self {
@@ -39,11 +50,17 @@ impl BinHashed for BinFNV {
             hash = hash ^ (*c as u32);
             hash = hash.wrapping_mul(0x01000193u32);
         }
-        Self { hash, unhashed: String::new() }
+        Self {
+            hash,
+            unhashed: String::new(),
+        }
     }
 
     fn from_hash_string(hash: Self::HashType, string: &str) -> Self {
-        Self { hash, unhashed: string.to_string() }
+        Self {
+            hash,
+            unhashed: string.to_string(),
+        }
     }
 
     fn get_hash(&self) -> Self::HashType {
@@ -53,28 +70,27 @@ impl BinHashed for BinFNV {
     fn get_string(&self) -> &str {
         &self.unhashed
     }
-}
 
-impl Display for BinFNV {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn format_to(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result  {
         if self.unhashed.len() != 0 {
             write!(f, "{:?}", self.unhashed)
         } else {
             write!(f, "0x{:08X}", self.hash)
         }
+    }
+}
+
+impl Display for BinFNV {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.format_to(f)
     }
 }
 
 impl Debug for BinFNV {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.unhashed.len() != 0 {
-            write!(f, "{:?}", self.unhashed)
-        } else {
-            write!(f, "0x{:08X}", self.hash)
-        }
+        self.format_to(f)
     }
 }
-
 
 impl Hash for BinFNV {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -114,7 +130,10 @@ impl BinHashed for BinXXH {
     type HashType = u64;
 
     fn from_hash(hash: Self::HashType) -> Self {
-        Self { hash, unhashed: String::new() }
+        Self {
+            hash,
+            unhashed: String::new(),
+        }
     }
 
     fn from_string(string: &str) -> Self {
@@ -122,7 +141,10 @@ impl BinHashed for BinXXH {
     }
 
     fn from_hash_string(hash: Self::HashType, string: &str) -> Self {
-        Self { hash, unhashed: string.to_string() }
+        Self {
+            hash,
+            unhashed: string.to_string(),
+        }
     }
 
     fn get_hash(&self) -> Self::HashType {
@@ -132,10 +154,8 @@ impl BinHashed for BinXXH {
     fn get_string(&self) -> &str {
         &self.unhashed
     }
-}
 
-impl Display for BinXXH {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn format_to(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result  {
         if self.unhashed.len() != 0 {
             write!(f, "{:?}", self.unhashed)
         } else {
@@ -144,13 +164,15 @@ impl Display for BinXXH {
     }
 }
 
+impl Display for BinXXH {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.format_to(f)
+    }
+}
+
 impl Debug for BinXXH {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.unhashed.len() != 0 {
-            write!(f, "{:?}", self.unhashed)
-        } else {
-            write!(f, "0x{:016X}", self.hash)
-        }
+        self.format_to(f)
     }
 }
 
@@ -182,18 +204,26 @@ impl Ord for BinXXH {
     }
 }
 
-pub struct BinHashList<T> where T : BinHashed {
+pub struct BinHashList<T>
+where
+    T: BinHashed,
+{
     pub list: HashMap<T::HashType, String>,
 }
 
-impl<T> BinHashList<T> where T : BinHashed {
+impl<T> BinHashList<T>
+where
+    T: BinHashed,
+{
     pub fn new() -> Self {
-        Self { list: HashMap::new() }
+        Self {
+            list: HashMap::new(),
+        }
     }
 
     pub fn read_from_file(&mut self, file: File) -> Result<(), String> {
         for line in BufReader::new(file).lines().into_iter() {
-            let line = line.map_err(|_|"Failed to read line".to_string())?;
+            let line = line.map_err(|_| "Failed to read line".to_string())?;
             let (hash, unhashed) = match line.split_once(" ") {
                 Some((hash_hex, hash_str)) => {
                     match T::HashType::from_str_radix(&hash_hex, 16) {
@@ -215,14 +245,14 @@ impl<T> BinHashList<T> where T : BinHashed {
             T::from_hash(hash)
         }
     }
-} 
+}
 
 pub struct BinHashes {
     pub entries: BinHashList<BinFNV>,
     pub fields: BinHashList<BinFNV>,
     pub hashes: BinHashList<BinFNV>,
     pub types: BinHashList<BinFNV>,
-    pub paths: BinHashList<BinXXH>, 
+    pub paths: BinHashList<BinXXH>,
 }
 impl BinHashes {
     pub fn new() -> BinHashes {

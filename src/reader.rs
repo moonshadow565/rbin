@@ -1,8 +1,8 @@
 use crate::*;
 use num_enum::TryFromPrimitive;
-use std::convert::{TryFrom};
 use std::collections::HashMap;
-use std::io::{Error, ErrorKind, Result, Read, Cursor, Seek, SeekFrom};
+use std::convert::TryFrom;
+use std::io::{Cursor, Error, ErrorKind, Read, Result, Seek, SeekFrom};
 
 #[derive(TryFromPrimitive, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
 #[repr(u8)]
@@ -39,7 +39,7 @@ enum BinType {
 pub struct BinReader<'a, 'b> {
     cur: Cursor<&'a [u8]>,
     depth: usize,
-    hashes: &'b BinHashes
+    hashes: &'b BinHashes,
 }
 
 impl<'a, 'b> BinReader<'a, 'b> {
@@ -50,7 +50,7 @@ impl<'a, 'b> BinReader<'a, 'b> {
     }
 
     fn read_u8(&mut self) -> Result<u8> {
-        let mut buffer  = [0; 1];
+        let mut buffer = [0; 1];
         self.cur.read_exact(&mut buffer)?;
         Ok(u8::from_le_bytes(buffer))
     }
@@ -104,14 +104,14 @@ impl<'a, 'b> BinReader<'a, 'b> {
     fn read_vec2(&mut self) -> Result<[f32; 2]> {
         let x = self.read_f32()?;
         let y = self.read_f32()?;
-        Ok([ x, y ])
+        Ok([x, y])
     }
 
     fn read_vec3(&mut self) -> Result<[f32; 3]> {
         let x = self.read_f32()?;
         let y = self.read_f32()?;
         let z = self.read_f32()?;
-        Ok([ x, y, z ])
+        Ok([x, y, z])
     }
 
     fn read_vec4(&mut self) -> Result<[f32; 4]> {
@@ -119,7 +119,7 @@ impl<'a, 'b> BinReader<'a, 'b> {
         let y = self.read_f32()?;
         let z = self.read_f32()?;
         let w = self.read_f32()?;
-        Ok([ x, y, z, w ])
+        Ok([x, y, z, w])
     }
 
     fn read_mtx44(&mut self) -> Result<[[f32; 4]; 4]> {
@@ -127,7 +127,7 @@ impl<'a, 'b> BinReader<'a, 'b> {
         let r1 = self.read_vec4()?;
         let r2 = self.read_vec4()?;
         let r3 = self.read_vec4()?;
-        Ok([ r0, r1, r2, r3 ])
+        Ok([r0, r1, r2, r3])
     }
 
     fn read_rgba(&mut self) -> Result<[u8; 4]> {
@@ -135,7 +135,7 @@ impl<'a, 'b> BinReader<'a, 'b> {
         let b = self.read_u8()?;
         let g = self.read_u8()?;
         let r = self.read_u8()?;
-        Ok([ r, g, b, a ])
+        Ok([r, g, b, a])
     }
 
     fn read_string(&mut self) -> Result<String> {
@@ -176,14 +176,21 @@ impl<'a, 'b> BinReader<'a, 'b> {
     fn read_sub_reader(&mut self) -> Result<BinReader<'a, 'b>> {
         let depth = self.depth + 1;
         if depth > 128 {
-            Err(Error::new(ErrorKind::Other, "Sub reader depth limit reached"))
+            Err(Error::new(
+                ErrorKind::Other,
+                "Sub reader depth limit reached",
+            ))
         } else {
             let len = self.read_u32()? as i64;
             let cur_pos = self.cur.position();
             let end_pos = self.cur.seek(SeekFrom::Current(len))? as usize;
             let mut cur = Cursor::new(&self.cur.get_ref()[..end_pos]);
             cur.set_position(cur_pos);
-            Ok(BinReader { cur, depth, hashes: self.hashes })
+            Ok(BinReader {
+                cur,
+                depth,
+                hashes: self.hashes,
+            })
         }
     }
 
@@ -230,7 +237,7 @@ impl<'a, 'b> BinReader<'a, 'b> {
                 } else {
                     io.read_value(value_type)?
                 }
-            },
+            }
             BinType::List | BinType::List2 => {
                 let value_type = io.read_type()?;
                 let mut io = io.read_sub_reader()?;
@@ -240,7 +247,7 @@ impl<'a, 'b> BinReader<'a, 'b> {
                     result.push(io.read_value(value_type)?)
                 }
                 BinValue::List(result)
-            },
+            }
             BinType::Map => {
                 let key_type = io.read_type()?;
                 let value_type = io.read_type()?;
@@ -253,7 +260,7 @@ impl<'a, 'b> BinReader<'a, 'b> {
                     result.push((key, value))
                 }
                 BinValue::Map(result)
-            },
+            }
             BinType::Pointer | BinType::Embed => {
                 let type_name = io.read_type_name()?;
                 if type_name.get_hash() == 0 {
@@ -274,7 +281,7 @@ impl<'a, 'b> BinReader<'a, 'b> {
             let type_name = self.read_type_name()?;
             type_names.push(type_name);
         }
-        let mut result= HashMap::new();
+        let mut result = HashMap::new();
         for type_name in type_names {
             let mut io = self.read_sub_reader()?;
             let key = io.read_entry_name()?;
@@ -287,7 +294,7 @@ impl<'a, 'b> BinReader<'a, 'b> {
 
     fn read_links(&mut self) -> Result<Vec<String>> {
         let count = self.read_u32()?;
-        let mut result= Vec::new();
+        let mut result = Vec::new();
         for _ in 0..count {
             let value = self.read_string()?;
             result.push(value);
@@ -297,13 +304,21 @@ impl<'a, 'b> BinReader<'a, 'b> {
 
     pub fn read_bin(data: &[u8], hashes: &BinHashes) -> Result<Bin> {
         let cur = Cursor::new(data);
-        let mut reader = BinReader{cur, depth: 0, hashes};
+        let mut reader = BinReader {
+            cur,
+            depth: 0,
+            hashes,
+        };
         let magic = reader.read_u32()?;
         if magic == 0x504f5250 {
             let version = reader.read_u32()?;
             let links = reader.read_links()?;
             let entries = reader.read_entries()?;
-            Ok(Bin{version, links, entries})
+            Ok(Bin {
+                version,
+                links,
+                entries,
+            })
         } else {
             Err(Error::new(ErrorKind::Other, "Bad bin magic"))
         }
