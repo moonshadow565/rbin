@@ -20,7 +20,7 @@ pub trait BinHashed: Clone + Debug + Eq + Ord + Hash {
     fn get_string(&self) -> &str;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct BinFNV {
     hash: u32,
     unhashed: String,
@@ -55,7 +55,7 @@ impl BinHashed for BinFNV {
     }
 }
 
-impl Display for &BinFNV {
+impl Display for BinFNV {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.unhashed.len() != 0 {
             write!(f, "{:?}", self.unhashed)
@@ -64,6 +64,17 @@ impl Display for &BinFNV {
         }
     }
 }
+
+impl Debug for BinFNV {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.unhashed.len() != 0 {
+            write!(f, "{:?}", self.unhashed)
+        } else {
+            write!(f, "0x{:08X}", self.hash)
+        }
+    }
+}
+
 
 impl Hash for BinFNV {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -93,7 +104,7 @@ impl Ord for BinFNV {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct BinXXH {
     hash: u64,
     unhashed: String,
@@ -123,7 +134,17 @@ impl BinHashed for BinXXH {
     }
 }
 
-impl Display for &BinXXH {
+impl Display for BinXXH {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.unhashed.len() != 0 {
+            write!(f, "{:?}", self.unhashed)
+        } else {
+            write!(f, "0x{:016X}", self.hash)
+        }
+    }
+}
+
+impl Debug for BinXXH {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.unhashed.len() != 0 {
             write!(f, "{:?}", self.unhashed)
@@ -162,11 +183,15 @@ impl Ord for BinXXH {
 }
 
 pub struct BinHashList<T> where T : BinHashed {
-    list: HashMap<T::HashType, String>,
+    pub list: HashMap<T::HashType, String>,
 }
 
 impl<T> BinHashList<T> where T : BinHashed {
-    pub fn read_file(&mut self, file: File) -> Result<(), String> {
+    pub fn new() -> Self {
+        Self { list: HashMap::new() }
+    }
+
+    pub fn read_from_file(&mut self, file: File) -> Result<(), String> {
         for line in BufReader::new(file).lines().into_iter() {
             let line = line.map_err(|_|"Failed to read line".to_string())?;
             let (hash, unhashed) = match line.split_once(" ") {
@@ -198,4 +223,15 @@ pub struct BinHashes {
     pub hashes: BinHashList<BinFNV>,
     pub types: BinHashList<BinFNV>,
     pub paths: BinHashList<BinXXH>, 
+}
+impl BinHashes {
+    pub fn new() -> BinHashes {
+        BinHashes {
+            entries: BinHashList::new(),
+            fields: BinHashList::new(),
+            hashes: BinHashList::new(),
+            types: BinHashList::new(),
+            paths: BinHashList::new(),
+        }
+    }
 }

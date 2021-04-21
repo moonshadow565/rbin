@@ -4,6 +4,8 @@ mod reader;
 pub use hashes::*;
 use reader::BinReader;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 
 #[derive(Clone, Debug)]
 pub enum BinValue {
@@ -34,7 +36,14 @@ pub struct Bin {
 }
 
 impl Bin {
-    pub fn read_from(data: &[u8], hashes: &BinHashes) -> std::io::Result<Bin> {
+    pub fn read_from_data(data: &[u8], hashes: &BinHashes) -> std::io::Result<Bin> {
         BinReader::read_bin(data, hashes)
+    }
+
+    pub fn read_from_file(file: File, hashes: &BinHashes) -> std::io::Result<Bin> {
+        let mut file = file;
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf)?;
+        Self::read_from_data(buf.as_slice(), hashes)
     }
 }
